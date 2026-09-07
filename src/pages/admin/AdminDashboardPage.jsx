@@ -10,8 +10,13 @@ export default function AdminDashboard({ shopId }) {
 
   // 1. Firebase se Real-time live data listen karein
   useEffect(() => {
-    if (!shopId) return;
+    // Agar shopId missing hai toh loading band karo
+    if (!shopId) {
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
     const ordersRef = collection(db, "shops", shopId, "orders");
     const q = query(ordersRef, orderBy("createdAt", "desc"));
 
@@ -34,7 +39,7 @@ export default function AdminDashboard({ shopId }) {
     return () => unsubscribe();
   }, [shopId]);
 
-  // 2. Dynamic Stats Calculation (Jaise hi orders badlenge, yeh turant update hoga)
+  // 2. Dynamic Stats Calculation
   const stats = useMemo(() => {
     let totalOrders = orders.length;
     let totalSales = 0;
@@ -44,14 +49,12 @@ export default function AdminDashboard({ shopId }) {
     orders.forEach((order) => {
       const orderStatus = order.status || "received";
       
-      // Calculate Pending & Completed counts
       if (orderStatus === "received" || orderStatus === "preparing") {
         pendingCount += 1;
       } else if (orderStatus === "completed") {
         completedCount += 1;
       }
 
-      // Calculate Total Sales (Completed orders ka total ya items sum)
       if (orderStatus !== "cancelled") {
         const amount = order.totalAmount || order.subtotal || 0;
         totalSales += Number(amount);
@@ -65,6 +68,14 @@ export default function AdminDashboard({ shopId }) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (!shopId) {
+    return (
+      <div className="p-6 text-center text-ink-700">
+        Shop ID missing. Please login again.
       </div>
     );
   }
