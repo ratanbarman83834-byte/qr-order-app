@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Clock } from "lucide-react";
 import { getShop } from "../services/shopService";
 import { useProducts } from "../hooks/useProducts";
 import ProductCard from "../components/ProductCard";
@@ -20,8 +21,17 @@ export default function ShopPage() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState(null);
 
   const { products, loading, error } = useProducts(shopId);
+
+  // Check localStorage for any active order in this shop
+  useEffect(() => {
+    const savedOrderId = localStorage.getItem(`activeOrderId_${shopId}`);
+    if (savedOrderId) {
+      setActiveOrderId(savedOrderId);
+    }
+  }, [shopId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +98,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="pb-28">
+    <div className="pb-36">
       <header className="bg-ink-950 px-5 pb-6 pt-8 text-paper">
         {shop.logo && (
           <img
@@ -125,6 +135,27 @@ export default function ShopPage() {
           </div>
         )}
       </main>
+
+      {/* Floating Active Order Banner */}
+      {activeOrderId && (
+        <div className="fixed bottom-20 left-4 right-4 z-30 flex items-center justify-between rounded-xl2 bg-ink-950 p-4 text-paper shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="animate-pulse rounded-lg bg-marigold-500 p-2 text-ink-950">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-xs text-paper/70">Active Order</p>
+              <p className="text-sm font-bold">Track your existing order</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate(`/shop/${shopId}/order/${activeOrderId}`)}
+            className="rounded-xl bg-marigold-500 px-4 py-2 text-xs font-bold text-ink-950 transition hover:bg-marigold-400"
+          >
+            View Status ➔
+          </button>
+        </div>
+      )}
 
       <CartBar onOpen={() => setCartOpen(true)} />
       <CartDrawer

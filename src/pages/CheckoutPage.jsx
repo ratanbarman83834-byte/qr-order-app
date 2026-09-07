@@ -41,6 +41,10 @@ export default function CheckoutPage() {
         notes,
         items,
       });
+
+      // 🟢 Add this line to save active order for this shop
+      localStorage.setItem(`activeOrderId_${shopId}`, result.orderId);
+
       clearCart();
       navigate(`/shop/${shopId}/order/${result.orderId}`, {
         state: { justPlaced: true, orderCode: result.orderCode },
