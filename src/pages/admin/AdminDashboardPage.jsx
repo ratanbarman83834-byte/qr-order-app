@@ -1,49 +1,64 @@
 
-import React from 'react';
-import { useOrders } from '../../hooks/useOrders';
-import StatsCards from '../../components/admin/StatsCards';
-import { OrderCard } from '../../components/admin/OrderCard';
-import { LoadingSkeleton } from '../../components/LoadingSkeleton';
+import React from "react";
+import { useOrders } from "../../hooks/useOrders";
+import StatsCards from "../../components/admin/StatsCards";
+import { OrderCard } from "../../components/admin/OrderCard";
+import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 
 export default function AdminDashboardPage() {
-  const { orders, loading, updateOrderStatus } = useOrders();
+  const {
+    orders,
+    loading,
+    updateOrderStatus,
+  } = useOrders();
 
   if (loading) {
     return <LoadingSkeleton count={4} />;
   }
 
-  // Calculate stats dynamically from all orders
+  // Total orders
   const totalOrders = orders.length;
 
+  // Calculate total sales
+  // Cancelled orders are not included
   const totalSales = orders.reduce((sum, order) => {
-    if (order.status === 'cancelled') return sum;
+    if (order.status === "Cancelled") {
+      return sum;
+    }
 
-    // Use order.totalAmount if available
     let amount = Number(order.totalAmount) || 0;
 
-    // If totalAmount is not available, calculate from items
-    if (amount === 0 && order.items && Array.isArray(order.items)) {
-      amount = order.items.reduce((itemSum, item) => {
-        return (
-          itemSum +
-          (Number(item.price) || 0) *
-            (Number(item.quantity) || 1)
-        );
-      }, 0);
+    // Fallback: calculate total from items
+    if (
+      amount === 0 &&
+      Array.isArray(order.items)
+    ) {
+      amount = order.items.reduce(
+        (itemSum, item) => {
+          const price = Number(item.price) || 0;
+          const quantity = Number(item.quantity) || 1;
+
+          return itemSum + price * quantity;
+        },
+        0
+      );
     }
 
     return sum + amount;
   }, 0);
 
+  // Active / pending orders
   const pendingOrders = orders.filter(
     (order) =>
-      order.status === 'new' ||
-      order.status === 'received' ||
-      order.status === 'preparing'
+      order.status === "New" ||
+      order.status === "Accepted" ||
+      order.status === "Preparing" ||
+      order.status === "Ready"
   ).length;
 
+  // Completed orders
   const completedOrders = orders.filter(
-    (order) => order.status === 'completed'
+    (order) => order.status === "Completed"
   ).length;
 
   // Show latest 6 orders
@@ -51,6 +66,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+
+      {/* Statistics */}
       <StatsCards
         totalOrders={totalOrders}
         totalSales={totalSales}
@@ -58,8 +75,9 @@ export default function AdminDashboardPage() {
         completedOrders={completedOrders}
       />
 
+      {/* Latest Orders */}
       <div>
-        <h2 className="text-xl font-bold text-stone-900 mb-4">
+        <h2 className="mb-4 text-xl font-bold text-stone-900">
           Latest orders
         </h2>
 
@@ -68,7 +86,7 @@ export default function AdminDashboardPage() {
             No orders placed yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {latestOrders.map((order) => (
               <OrderCard
                 key={order.id}
