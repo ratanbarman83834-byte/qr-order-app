@@ -1,112 +1,113 @@
-import { useEffect, useRef, useState } from "react";
-import { useOwnerShop } from "../../hooks/useOwnerShop";
-import { useOrders } from "../../hooks/useOrders";
-import { useAuth } from "../../context/AuthContext";
-import StatsCards from "../../components/admin/StatsCards";
+import { useEffect, useState, useMemo } from "react";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../firebase/config";
 import OrderCard from "../../components/admin/OrderCard";
-import { OrderListSkeleton } from "../../components/LoadingSkeleton";
-import { registerOwnerForPush } from "../../firebase/messaging";
-import {
-  requestNotificationPermission,
-  showNotification,
-} from "../../utils/notification";
+import { Spinner } from "../../components/LoadingSkeleton";
 
-export default function AdminDashboardPage() {
-  const { user } = useAuth();
-  const { shop, loading: shopLoading, error: shopError } = useOwnerShop();
-  const { orders, loading, error } = useOrders(shop?.id);
-  const [pushStatus, setPushStatus] = useState(null);
+export default function AdminDashboard({ shopId }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Initial load tracking ref (pehli baar refresh hone par sound na baje)
-  const prevOrdersCountRef = useRef(null);
-
+  // 1. Firebase se Real-time live data listen karein
   useEffect(() => {
-    if (!user) return;
-    registerOwnerForPush(user.uid).then(setPushStatus);
-    // Notification permission ask karein
-    requestNotificationPermission();
-  }, [user]);
+    if (!shopId) return;
 
-  // 🟢 Live New Order Alert (Sound + Browser Notification)
-  useEffect(() => {
-    if (loading || !orders) return;
+    const ordersRef = collection(db, "shops", shopId, "orders");
+    const q = query(ordersRef, orderBy("createdAt", "desc"));
 
-    // First load par orders count save karein
-    if (prevOrdersCountRef.current === null) {
-      prevOrdersCountRef.current = orders.length;
-      return;
-    }
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const orderList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setOrders(orderList);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching live orders:", error);
+        setLoading(false);
+      }
+    );
 
-    // Jab naya order aaye (Count increase ho)
-    if (orders.length > prevOrdersCountRef.current) {
-      const latestOrder = orders[0]; // Newest order
+    return () => unsubscribe();
+  }, [shopId]);
 
-      // 1. Sound Play
-      const audio = new Audio("/alert.mp3");
-      audio.play().catch((err) =>
-        console.log("Audio play blocked by browser:", err)
-      );
+  // 2. Dynamic Stats Calculation (Jaise hi orders badlenge, yeh turant update hoga)
+  const stats = useMemo(() => {
+    let totalOrders = orders.length;
+    let totalSales = 0;
+    let pendingCount = 0;
+    let completedCount = 0;
 
-      // 2. Desktop/Mobile Notification
-      showNotification(
-        "🚨 New Order Received!",
-        `Order from ${latestOrder?.customerName || "Customer"}`
-      );
-    }
+    orders.forEach((order) => {
+      const orderStatus = order.status || "received";
+      
+      // Calculate Pending & Completed counts
+      if (orderStatus === "received" || orderStatus === "preparing") {
+        pendingCount += 1;
+      } else if (orderStatus === "completed") {
+        completedCount += 1;
+      }
 
-    prevOrdersCountRef.current = orders.length;
-  }, [orders, loading]);
+      // Calculate Total Sales (Completed orders ka total ya items sum)
+      if (orderStatus !== "cancelled") {
+        const amount = order.totalAmount || order.subtotal || 0;
+        totalSales += Number(amount);
+      }
+    });
 
-  if (shopLoading) return <OrderListSkeleton />;
-  if (shopError) {
+    return { totalOrders, totalSales, pendingCount, completedCount };
+  }, [orders]);
+
+  if (loading) {
     return (
-      <p className="rounded-xl2 bg-paper p-5 text-ink-700 shadow-soft">
-        {shopError}
-      </p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <Spinner />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">{shop.name}</h1>
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Dynamic Top Stats Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5">
+          <p className="text-xs font-semibold text-ink-700">Total orders</p>
+          <h3 className="text-2xl font-black text-ink-950 mt-1">{stats.totalOrders}</h3>
+        </div>
+
+        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5">
+          <p className="text-xs font-semibold text-ink-700">Total sales</p>
+          <h3 className="text-2xl font-black text-ink-950 mt-1">₹{stats.totalSales}</h3>
+        </div>
+
+        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5">
+          <p className="text-xs font-semibold text-ink-700">Pending</p>
+          <h3 className="text-2xl font-black text-marigold-600 mt-1">{stats.pendingCount}</h3>
+        </div>
+
+        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5">
+          <p className="text-xs font-semibold text-ink-700">Completed</p>
+          <h3 className="text-2xl font-black text-emerald-600 mt-1">{stats.completedCount}</h3>
+        </div>
       </div>
 
-      {pushStatus === "denied" && (
-        <PushBanner text="Push notifications are blocked in your browser. You'll still see new orders here in real time — enable notifications in your browser settings to also get mobile alerts." />
-      )}
-      {pushStatus === "unsupported" && (
-        <PushBanner text="This browser doesn't support push notifications. New orders will still appear here instantly — keep this dashboard open, or open it from a supported mobile browser to enable push alerts." />
-      )}
-
-      {loading ? (
-        <OrderListSkeleton />
-      ) : error ? (
-        <p className="text-ink-700">{error}</p>
-      ) : (
-        <>
-          <StatsCards orders={orders} />
-          <div>
-            <h2 className="mb-3 text-lg font-bold">Latest orders</h2>
-            <div className="space-y-3">
-              {orders.slice(0, 6).map((order) => (
-                <OrderCard key={order.id} order={order} />
-              ))}
-              {orders.length === 0 && (
-                <p className="text-ink-700">No orders yet today.</p>
-              )}
-            </div>
+      {/* Latest Orders List */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-extrabold text-ink-950">Latest orders</h2>
+        
+        {orders.length === 0 ? (
+          <p className="text-sm text-ink-700">No orders placed yet.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {orders.map((order) => (
+              <OrderCard key={order.id} order={order} shopId={shopId} />
+            ))}
           </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function PushBanner({ text }) {
-  return (
-    <div className="rounded-xl2 bg-marigold-50 px-4 py-3 text-sm text-marigold-700">
-      {text}
+        )}
+      </div>
     </div>
   );
 }
