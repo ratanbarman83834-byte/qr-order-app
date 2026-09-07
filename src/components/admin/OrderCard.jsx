@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { 
   Clock, 
   Utensils, 
@@ -33,10 +33,17 @@ export default function OrderCard({ order = {}, shopId }) {
     try {
       const orderRef = doc(db, "shops", currentShopId, "orders", order.id);
       
-      await updateDoc(orderRef, {
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-      });
+      // updateDoc ki jagah setDoc with merge: true use kiya hai
+      await setDoc(
+        orderRef, 
+        {
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+        }, 
+        { merge: true }
+      );
+
+      console.log(`Order status updated to: ${newStatus}`);
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update order status. Please try again.");
