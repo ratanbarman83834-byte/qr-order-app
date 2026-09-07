@@ -1,23 +1,27 @@
 import { useEffect, useState, useMemo } from "react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../../firebase/config";
+import { auth, db } from "../../firebase/config";
 import OrderCard from "../../components/admin/OrderCard";
 import { Spinner } from "../../components/LoadingSkeleton";
 
-export default function AdminDashboard({ shopId }) {
+export default function AdminDashboard({ shopId: propShopId }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Firebase se Real-time live data listen karein
+  // Prop -> localStorage -> Firebase Auth fallback chain
+  const effectiveShopId = 
+    propShopId || 
+    localStorage.getItem("shopId") || 
+    auth.currentUser?.uid;
+
   useEffect(() => {
-    // Agar shopId missing hai toh loading band karo
-    if (!shopId) {
+    if (!effectiveShopId) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    const ordersRef = collection(db, "shops", shopId, "orders");
+    const ordersRef = collection(db, "shops", effectiveShopId, "orders");
     const q = query(ordersRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(
@@ -37,9 +41,9 @@ export default function AdminDashboard({ shopId }) {
     );
 
     return () => unsubscribe();
-  }, [shopId]);
+  }, [effectiveShopId]);
 
-  // 2. Dynamic Stats Calculation
+  // Dynamic Stats Calculation
   const stats = useMemo(() => {
     let totalOrders = orders.length;
     let totalSales = 0;
@@ -72,10 +76,18 @@ export default function AdminDashboard({ shopId }) {
     );
   }
 
-  if (!shopId) {
+  if (!effectiveShopId) {
     return (
-      <div className="p-6 text-center text-ink-700">
-        Shop ID missing. Please login again.
+      <div className="p-12 text-center space-y-3">
+        <p className="text-sm font-semibold text-ink-700">
+          Shop ID missing. Please login again.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-xl bg-marigold-500 px-4 py-2 text-xs font-bold text-ink-950 shadow-soft"
+        >
+          Refresh Page
+        </button>
       </div>
     );
   }
@@ -114,7 +126,7 @@ export default function AdminDashboard({ shopId }) {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {orders.map((order) => (
-              <OrderCard key={order.id} order={order} shopId={shopId} />
+              <OrderCard key={order.id} order={order} shopId={effectiveShopId} />
             ))}
           </div>
         )}
