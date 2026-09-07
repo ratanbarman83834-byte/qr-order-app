@@ -7,54 +7,91 @@ import { OrderCard } from "../../components/admin/OrderCard";
 import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 
 export default function AdminDashboardPage() {
-  // Get the currently logged-in owner's shop
-  const { shop } = useOwnerShop();
-
-  // IMPORTANT:
-  // Pass shop.id so orders can be loaded for this shop
+  // Get owner's shop
   const {
-    orders,
-    loading,
+    shop,
+    loading: shopLoading,
+    error: shopError,
+  } = useOwnerShop();
+
+  // Load orders only after shop ID is available
+  const {
+    orders = [],
+    loading: ordersLoading,
+    error: ordersError,
     updateOrderStatus,
   } = useOrders(shop?.id);
 
-  if (loading) {
+  // Wait for shop and orders
+  if (shopLoading || ordersLoading) {
     return <LoadingSkeleton count={4} />;
   }
 
-  // Total orders
+  // Show shop error
+  if (shopError) {
+    return (
+      <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
+        {shopError}
+      </div>
+    );
+  }
+
+  // Show orders error
+  if (ordersError) {
+    return (
+      <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
+        {ordersError}
+      </div>
+    );
+  }
+
+  // No shop found
+  if (!shop?.id) {
+    return (
+      <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 text-amber-700">
+        No shop found for this account.
+      </div>
+    );
+  }
+
+  // ==============================
+  // DASHBOARD STATISTICS
+  // ==============================
+
+  // Total number of orders
   const totalOrders = orders.length;
 
-  // Calculate total sales
-  // Cancelled orders are not included
-  const totalSales = orders.reduce((sum, order) => {
+  // Total sales
+  // Cancelled orders are excluded
+  const totalSales = orders.reduce((total, order) => {
     if (order.status === "Cancelled") {
-      return sum;
+      return total;
     }
 
-    // Use stored totalAmount if available
+    // First try totalAmount
     let amount = Number(order.totalAmount) || 0;
 
-    // Fallback: calculate total from ordered items
+    // If totalAmount is missing, calculate from items
     if (amount === 0 && Array.isArray(order.items)) {
-      amount = order.items.reduce((itemSum, item) => {
+      amount = order.items.reduce((itemTotal, item) => {
         const price = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 1;
 
-        return itemSum + price * quantity;
+        return itemTotal + price * quantity;
       }, 0);
     }
 
-    return sum + amount;
+    return total + amount;
   }, 0);
 
-  // Active / pending orders
-  const pendingOrders = orders.filter(
-    (order) =>
-      order.status === "New" ||
-      order.status === "Accepted" ||
-      order.status === "Preparing" ||
-      order.status === "Ready"
+  // Pending / active orders
+  const pendingOrders = orders.filter((order) =>
+    [
+      "New",
+      "Accepted",
+      "Preparing",
+      "Ready",
+    ].includes(order.status)
   ).length;
 
   // Completed orders
@@ -68,7 +105,10 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
 
-      {/* Statistics Cards */}
+      {/* ==============================
+          STATS CARDS
+      ============================== */}
+
       <StatsCards
         totalOrders={totalOrders}
         totalSales={totalSales}
@@ -76,16 +116,25 @@ export default function AdminDashboardPage() {
         completedOrders={completedOrders}
       />
 
-      {/* Latest Orders */}
+      {/* ==============================
+          LATEST ORDERS
+      ============================== */}
+
       <div>
         <h2 className="mb-4 text-xl font-bold text-stone-900">
           Latest orders
         </h2>
 
         {latestOrders.length === 0 ? (
-          <p className="text-stone-500">
-            No orders placed yet.
-          </p>
+          <div className="rounded-xl bg-white border border-stone-200 p-8 text-center">
+            <p className="text-stone-500">
+              No orders placed yet.
+            </p>
+
+            <p className="mt-2 text-xs text-stone-400">
+              Shop ID: {shop.id}
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {latestOrders.map((order) => (
