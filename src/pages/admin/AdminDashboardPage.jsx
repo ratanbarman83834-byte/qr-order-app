@@ -14,7 +14,7 @@ export default function AdminDashboardPage() {
     error: shopError,
   } = useOwnerShop();
 
-  // Load orders only after shop ID is available
+  // Load orders for this shop
   const {
     orders = [],
     loading: ordersLoading,
@@ -27,7 +27,7 @@ export default function AdminDashboardPage() {
     return <LoadingSkeleton count={4} />;
   }
 
-  // Show shop error
+  // Shop error
   if (shopError) {
     return (
       <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
@@ -36,7 +36,7 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Show orders error
+  // Orders error
   if (ordersError) {
     return (
       <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
@@ -45,7 +45,7 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // No shop found
+  // No shop
   if (!shop?.id) {
     return (
       <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 text-amber-700">
@@ -55,23 +55,63 @@ export default function AdminDashboardPage() {
   }
 
   // ==============================
+  // NORMALIZE STATUS
+  // ==============================
+
+  const getStatus = (status) => {
+    if (!status) return "New";
+
+    const value = String(status).toLowerCase();
+
+    switch (value) {
+      case "new":
+      case "received":
+        return "New";
+
+      case "accepted":
+        return "Accepted";
+
+      case "preparing":
+        return "Preparing";
+
+      case "ready":
+        return "Ready";
+
+      case "completed":
+        return "Completed";
+
+      case "cancelled":
+        return "Cancelled";
+
+      default:
+        return status;
+    }
+  };
+
+  // ==============================
   // DASHBOARD STATISTICS
   // ==============================
 
-  // Total number of orders
   const totalOrders = orders.length;
 
   // Total sales
   // Cancelled orders are excluded
-  const totalSales = orders.reduce((total, order) => {
-    if (order.status === "Cancelled") {
-      return total;
+  const totalSales = orders.reduce((sum, order) => {
+    const status = getStatus(order.status);
+
+    if (status === "Cancelled") {
+      return sum;
     }
 
-    // First try totalAmount
-    let amount = Number(order.totalAmount) || 0;
+    // Your Firestore currently uses "total"
+    let amount = Number(order.total) || 0;
 
-    // If totalAmount is missing, calculate from items
+    // Compatibility with totalAmount
+    if (amount === 0) {
+      amount = Number(order.totalAmount) || 0;
+    }
+
+    // Final fallback: calculate from items
     if (amount === 0 && Array.isArray(order.items)) {
       amount = order.items.reduce((itemTotal, item) => {
         const price = Number(item.price) || 0;
@@ -81,23 +121,25 @@ export default function AdminDashboardPage() {
       }, 0);
     }
 
-    return total + amount;
+    return sum + amount;
   }, 0);
 
   // Pending / active orders
-  const pendingOrders = orders.filter((order) =>
-    [
+  const pendingOrders = orders.filter((order) => {
+    const status = getStatus(order.status);
+
+    return [
       "New",
       "Accepted",
       "Preparing",
       "Ready",
-    ].includes(order.status)
-  ).length;
+    ].includes(status);
+  }).length;
 
   // Completed orders
-  const completedOrders = orders.filter(
-    (order) => order.status === "Completed"
-  ).length;
+  const completedOrders = orders.filter((order) => {
+    return getStatus(order.status) === "Completed";
+  }).length;
 
   // Latest 6 orders
   const latestOrders = orders.slice(0, 6);
@@ -109,12 +151,7 @@ export default function AdminDashboardPage() {
           STATS CARDS
       ============================== */}
 
-      <StatsCards
-        totalOrders={totalOrders}
-        totalSales={totalSales}
-        pendingOrders={pendingOrders}
-        completedOrders={completedOrders}
-      />
+      <StatsCards orders={orders} />
 
       {/* ==============================
           LATEST ORDERS
