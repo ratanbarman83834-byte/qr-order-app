@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Clock } from "lucide-react";
+import { Clock, X } from "lucide-react";
 import { getShop } from "../services/shopService";
 import { useProducts } from "../hooks/useProducts";
 import ProductCard from "../components/ProductCard";
@@ -22,12 +22,12 @@ export default function ShopPage() {
   const [search, setSearch] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
 
-  // Single ID ki jagah Multiple IDs ki List state
+  // Active Orders list & Modal state
   const [activeOrderIds, setActiveOrderIds] = useState([]);
+  const [ordersModalOpen, setOrdersModalOpen] = useState(false);
 
   const { products, loading, error } = useProducts(shopId);
 
-  // LocalStorage se Multiple Active Orders fetch karne ka logic
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`activeOrderIds_${shopId}`);
@@ -39,7 +39,6 @@ export default function ShopPage() {
           setActiveOrderIds([saved]);
         }
       } else {
-        // Fallback agar purani single key mojood ho
         const legacySingle = localStorage.getItem(`activeOrderId_${shopId}`);
         if (legacySingle) {
           setActiveOrderIds([legacySingle]);
@@ -153,7 +152,7 @@ export default function ShopPage() {
         )}
       </main>
 
-      {/* Multiple Active Orders Tracking Banner */}
+      {/* Active Orders Banner */}
       {activeOrderIds.length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-30 flex items-center justify-between rounded-xl2 bg-ink-950 p-4 text-paper shadow-soft">
           <div className="flex items-center gap-3">
@@ -169,22 +168,64 @@ export default function ShopPage() {
               <p className="text-sm font-bold">
                 {activeOrderIds.length === 1
                   ? "Track your order"
-                  : "Track your latest order"}
+                  : "Track all your active orders"}
               </p>
             </div>
           </div>
           <button
-            onClick={() =>
-              navigate(
-                `/shop/${shopId}/order/${
-                  activeOrderIds[activeOrderIds.length - 1]
-                }`
-              )
-            }
+            onClick={() => {
+              if (activeOrderIds.length === 1) {
+                navigate(`/shop/${shopId}/order/${activeOrderIds[0]}`);
+              } else {
+                setOrdersModalOpen(true);
+              }
+            }}
             className="rounded-xl bg-marigold-500 px-4 py-2 text-xs font-bold text-ink-950 transition hover:bg-marigold-400"
           >
-            {activeOrderIds.length === 1 ? "View Status ➔" : "View Latest ➔"}
+            {activeOrderIds.length === 1 ? "View Status ➔" : "View All ➔"}
           </button>
+        </div>
+      )}
+
+      {/* Multiple Orders Selector Modal */}
+      {ordersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/60 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-xl2 bg-paper p-5 shadow-soft space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-950/10 pb-3">
+              <h3 className="text-lg font-bold text-ink-950">Select Order to Track</h3>
+              <button
+                onClick={() => setOrdersModalOpen(false)}
+                className="rounded-full p-1 text-ink-700 hover:bg-sand"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {activeOrderIds.map((id, index) => (
+                <div
+                  key={id}
+                  onClick={() => {
+                    setOrdersModalOpen(false);
+                    navigate(`/shop/${shopId}/order/${id}`);
+                  }}
+                  className="flex items-center justify-between rounded-xl bg-sand p-3.5 cursor-pointer hover:bg-marigold-500/20 transition"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-ink-950">
+                      Order #{index + 1}
+                    </p>
+                    <p className="text-xs text-ink-700">
+                      ID: ...{id.slice(-6)}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-ink-950 bg-marigold-500 px-3 py-1.5 rounded-lg">
+                    Track Status ➔
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
