@@ -1,5 +1,5 @@
 
-import 
+import {
   collection,
   doc,
   onSnapshot,
