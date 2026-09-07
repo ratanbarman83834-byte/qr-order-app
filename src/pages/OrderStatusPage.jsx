@@ -9,7 +9,11 @@ import { Spinner } from "../components/LoadingSkeleton";
 export default function OrderStatusPage() {
   const { orderId } = useParams();
   const [searchParams] = useSearchParams();
-  const shopIdFromUrl = searchParams.get("shopId") || localStorage.getItem("shopId");
+
+  const shopId = 
+    searchParams.get("shopId") || 
+    localStorage.getItem("shopId") || 
+    localStorage.getItem("currentShopId");
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,54 +26,57 @@ export default function OrderStatusPage() {
     }
 
     setLoading(true);
+    let unsubscribe = null;
 
-    // 1. Live real-time status tracker agar shopId available ho
-    if (shopIdFromUrl) {
-      const orderRef = doc(db, "shops", shopIdFromUrl, "orders", orderId);
-      
-      const unsubscribe = onSnapshot(
-        orderRef, 
-        (docSnap) => {
-          if (docSnap.exists()) {
-            setOrder({ id: docSnap.id, ...docSnap.data() });
-            setLoading(false);
-          } else {
-            fetchByCollectionGroup();
-          }
-        }, 
-        () => {
-          fetchByCollectionGroup();
-        }
-      );
+    async function fetchOrder() {
+      const cleanOrderId = orderId.replace("#", "").trim();
 
-      return () => unsubscribe();
-    } else {
-      fetchByCollectionGroup();
+      // Priority 1: Direct Doc Read (No Index required)
+      if (shopId) {
+        const orderRef = doc(db, "shops", shopId, "orders", cleanOrderId);
+        unsubscribe = onSnapshot(
+          orderRef, 
+          (docSnap) => {
+            if (docSnap.exists()) {
+              setOrder({ id: docSnap.id, ...docSnap.data() });
+              setLoading(false);
+            } else {
+              fallbackGlobalSearch(cleanOrderId);
+            }
+          },
+          () => fallbackGlobalSearch(cleanOrderId)
+        );
+        return;
+      }
+
+      await fallbackGlobalSearch(cleanOrderId);
     }
 
-    // 2. Collection Group Query (Agar shopId URL me na ho toh bhi order dhoondh lega)
-    async function fetchByCollectionGroup() {
+    async function fallbackGlobalSearch(code) {
       try {
-        const q = query(
-          collectionGroup(db, "orders"),
-          where("id", "==", orderId)
-        );
+        const q = query(collectionGroup(db, "orders"), where("id", "==", code));
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {
-          const foundDoc = snapshot.docs[0];
-          setOrder({ id: foundDoc.id, ...foundDoc.data() });
+          const docSnap = snapshot.docs[0];
+          setOrder({ id: docSnap.id, ...docSnap.data() });
         } else {
           setOrder(null);
         }
       } catch (err) {
-        console.error("Error finding order:", err);
+        console.warn("Index not ready yet or collection query failed:", err.message);
         setOrder(null);
       } finally {
         setLoading(false);
       }
     }
-  }, [orderId, shopIdFromUrl]);
+
+    fetchOrder();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [orderId, shopId]);
 
   if (loading) {
     return (
@@ -79,7 +86,6 @@ export default function OrderStatusPage() {
     );
   }
 
-  // Order Not Found
   if (!order) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-4 bg-paper">
@@ -150,7 +156,7 @@ export default function OrderStatusPage() {
           </div>
         </div>
 
-        {/* Ordered Items */}
+        {/* Items List */}
         <div className="space-y-2">
           <p className="text-xs font-bold uppercase text-ink-700">Items Ordered:</p>
           {order?.items?.map((item, idx) => (

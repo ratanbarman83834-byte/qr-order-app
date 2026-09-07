@@ -49,6 +49,12 @@ export default function CheckoutPage() {
         items,
       });
 
+      // 🟢 Shop ID ko localStorage mein explicitly store karein
+      if (shopId) {
+        localStorage.setItem("shopId", shopId);
+        localStorage.setItem("currentShopId", shopId);
+      }
+
       // Multiple active orders save karne ka logic
       const existingOrders = JSON.parse(
         localStorage.getItem(`activeOrderIds_${shopId}`) || "[]"
@@ -69,7 +75,9 @@ export default function CheckoutPage() {
       );
 
       clearCart();
-      navigate(`/shop/${shopId}/order/${result.orderId}`, {
+
+      // 🟢 URL ke saath ?shopId=${shopId} attach karein taaki direct document fetch ho sake
+      navigate(`/shop/${shopId}/order/${result.orderId}?shopId=${shopId}`, {
         state: { justPlaced: true, orderCode: result.orderCode },
         replace: true,
       });
