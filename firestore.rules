@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwnerOf(shopId) {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid;
+    }
+
+    // Shops: anyone can read (needed to show the shop name on the public
+    // menu page from a scanned QR code). Only the authenticated owner of a
+    // shop can edit it, and shops are never created from the client.
+    match /shops/{shopId} {
+      allow read: if true;
+      allow update: if isOwnerOf(shopId);
+      allow create, delete: if false;
+    }
+
+    // Products: public read (the customer menu), but ALL writes are blocked
+    // from the client entirely — the admin dashboard uses the Firebase Admin
+    // SDK indirectly is not how we do it here, so instead product writes go
+    // through normal client SDK calls authenticated as the shop owner.
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+        isOwnerOf(request.resource.data.shopId);
+      allow update, delete: if request.auth != null &&
+        isOwnerOf(resource.data.shopId);
+    }
+
+    // Orders: this is the security-critical collection.
+    // - Orders are NEVER created directly from the client. They are only
+    //   ever written by the "createOrder" Cloud Function (Admin SDK bypasses
+    //   these rules), which is what recalculates prices server-side.
+    // - A customer can read their own just-placed order (for the tracking
+    //   page) because they hold its document ID, which acts as a bearer
+    //   token — nothing else identifies them.
+    // - Only the authenticated shop owner can read the full order list or
+    //   change status.
+    match /orders/{orderId} {
+      allow get: if true; // requires knowing the random orderId
+      allow list: if request.auth != null && isOwnerOf(resource.data.shopId);
+      allow create: if false; // Cloud Function (Admin SDK) only
+      allow update: if request.auth != null && isOwnerOf(resource.data.shopId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["status", "statusUpdatedAt"]);
+      allow delete: if false;
+    }
+
+    // Device tokens for push notifications: an owner can only manage their
+    // own device list.
+    match /ownerDevices/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
