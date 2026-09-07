@@ -29,19 +29,21 @@ export default function AdminQRPage() {
       return;
     }
 
+    // shop.name missing ho tab bhi crash nahi hoga
+    const safeShopName = shop?.name ? shop.name : "my-shop";
+    const fileName = `${safeShopName.replace(/\s+/g, "-").toLowerCase()}-qr.png`;
+
     const pngUrl = canvas.toDataURL("image/png");
     const downloadLink = document.createElement("a");
     downloadLink.href = pngUrl;
-    downloadLink.download = `${shop?.name ? shop.name.replace(/\s+/g, "-").toLowerCase() : "shop"}-qr.png`;
+    downloadLink.download = fileName;
 
-    // Link ko DOM me attach karke click trigger kar rahe hain (Browser Block Fix)
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
 
     toast.success("QR Code downloaded!");
   }
-
   return (
     <div className="max-w-md space-y-5">
       <h1 className="text-2xl font-extrabold">QR code</h1>
