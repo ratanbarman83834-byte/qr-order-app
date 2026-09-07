@@ -1,84 +1,73 @@
-import { useState } from "react";
-import toast from "react-hot-toast";
 import { ORDER_STATUSES, updateOrderStatus } from "../../services/orderService";
-import { formatCurrency, formatTime } from "../../utils/formatCurrency";
+import { formatCurrency } from "../../utils/formatCurrency";
 
-const STATUS_STYLES = {
-  New: "bg-marigold-100 text-marigold-700",
-  Accepted: "bg-leaf-100 text-leaf-600",
-  Preparing: "bg-leaf-100 text-leaf-600",
-  Ready: "bg-leaf-500 text-paper",
-  Completed: "bg-ink-950/10 text-ink-800",
-  Cancelled: "bg-clay-500/10 text-clay-600",
-};
+function formatOrderDate(createdAt) {
+  if (!createdAt) return "Just now";
+  // Firestore timestamp to JS Date conversion
+  const date = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+  if (isNaN(date.getTime())) return "Just now";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
-export default function OrderCard({ order, highlighted }) {
-  const [updating, setUpdating] = useState(false);
-
-  async function handleStatusChange(e) {
+export default function OrderCard({ order }) {
+  const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
-    setUpdating(true);
     try {
       await updateOrderStatus(order.id, newStatus);
     } catch (err) {
-      console.error(err);
-      toast.error("Couldn't update status. Try again.");
-    } finally {
-      setUpdating(false);
+      console.error("Status update error:", err);
     }
-  }
+  };
 
   return (
-    <div
-      id={`order-${order.id}`}
-      className={`rounded-xl2 bg-paper p-4 shadow-soft ${
-        highlighted ? "ring-2 ring-marigold-500" : ""
-      }`}
-    >
-      <div className="flex items-start justify-between">
+    <div className="rounded-xl2 bg-paper p-4 shadow-soft space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="font-bold">{order.orderCode}</p>
-          <p className="text-sm text-ink-700">
-            {order.customerName}
-            {order.tableNumber && ` · Table ${order.tableNumber}`}
-            {order.customerPhone && ` · ${order.customerPhone}`}
-          </p>
+          <h3 className="font-bold text-ink-950">
+            {order.customerName || "Customer"}{" "}
+            {order.customerPhone && `· ${order.customerPhone}`}
+          </h3>
+          {order.tableNumber && (
+            <p className="text-xs text-ink-700">Table: {order.tableNumber}</p>
+          )}
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[order.status]}`}
-        >
+        <span className="rounded-full bg-sand px-3 py-1 text-xs font-semibold text-ink-800">
           {order.status}
         </span>
       </div>
 
-      <div className="mt-3 space-y-0.5 border-t border-ink-950/5 pt-3">
-        {order.items.map((item, idx) => (
-          <p key={idx} className="text-sm text-ink-800">
-            {item.productName} × {item.quantity} — {formatCurrency(item.subtotal)}
-          </p>
+      {/* Items list with fallback for missing properties */}
+      <div className="border-t border-b border-sand py-2 space-y-1">
+        {order.items?.map((item, idx) => (
+          <div key={idx} className="flex justify-between text-sm">
+            <span>
+              {item.name || "Item"} × {item.quantity}
+            </span>
+            <span>
+              {item.price ? formatCurrency(item.price * item.quantity) : ""}
+            </span>
+          </div>
         ))}
       </div>
 
-      {order.notes && (
-        <p className="mt-2 rounded-lg bg-sand px-3 py-2 text-sm italic text-ink-700">
-          "{order.notes}"
-        </p>
-      )}
-
-      <div className="mt-3 flex items-center justify-between border-t border-ink-950/5 pt-3">
+      <div className="flex items-center justify-between pt-1">
         <div>
-          <p className="font-bold">{formatCurrency(order.total)}</p>
-          <p className="text-xs text-ink-700">{formatTime(order.createdAt)}</p>
+          <p className="text-lg font-extrabold">
+            {formatCurrency(order.total || 0)}
+          </p>
+          <p className="text-xs text-ink-700">
+            {formatOrderDate(order.createdAt)}
+          </p>
         </div>
+
         <select
           value={order.status}
           onChange={handleStatusChange}
-          disabled={updating}
-          className="rounded-xl bg-sand px-3 py-2 text-sm font-medium outline-none disabled:opacity-60"
+          className="rounded-xl bg-sand px-3 py-1.5 text-sm font-semibold outline-none"
         >
-          {ORDER_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
+          {ORDER_STATUSES.map((st) => (
+            <option key={st} value={st}>
+              {st}
             </option>
           ))}
         </select>
