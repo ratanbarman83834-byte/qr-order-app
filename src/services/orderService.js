@@ -7,7 +7,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../firebase/config"; // functions import ki zaroorat nahi hai
+import { db } from "../firebase/config";
 
 /**
  * Places an order by calling our free Vercel Serverless API (/api/createOrder).
@@ -31,7 +31,10 @@ export async function placeOrder({
       customerPhone: customerPhone || "",
       tableNumber: tableNumber || "",
       notes: notes || "",
-      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      items: items.map((i) => ({ 
+        productId: i.productId || i.id, // Checks both productId and id
+        quantity: i.quantity 
+      })),
     }),
   });
 
