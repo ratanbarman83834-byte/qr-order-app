@@ -2,7 +2,7 @@ import React from 'react';
 import { useOrders } from '../../hooks/useOrders';
 import { StatsCards } from '../../components/admin/StatsCards';
 import { OrderCard } from '../../components/admin/OrderCard';
-import LoadingSkeleton from '../../components/LoadingSkeleton';
+import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 
 export function AdminDashboardPage() {
   const { orders, loading, updateOrderStatus } = useOrders();
