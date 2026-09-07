@@ -1,6 +1,5 @@
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin (Only once)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -14,16 +13,6 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 export default async function handler(req, res) {
-  // CORS Headers allow karein
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -34,12 +23,14 @@ export default async function handler(req, res) {
     let total = 0;
     const verifiedItems = [];
 
-    // Server-side price lookup (Security)
+    // Direct top-level 'products' collection se price verify karein
     for (const item of items) {
-      const productDoc = await db.collection('shops').doc(shopId).collection('products').doc(item.productId).get();
+      const productDoc = await db.collection('products').doc(item.productId).get();
+
       if (!productDoc.exists) {
-        return res.status(400).json({ error: `Product not found` });
+        return res.status(400).json({ error: `Product ID (${item.productId}) database me nahi milne ke karan order stop hua.` });
       }
+
       const data = productDoc.data();
       total += data.price * item.quantity;
       verifiedItems.push({
@@ -63,11 +54,7 @@ export default async function handler(req, res) {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return res.status(200).json({
-      orderId: orderRef.id,
-      total,
-      status: "New"
-    });
+    return res.status(200).json({ orderId: orderRef.id, total, status: "New" });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
