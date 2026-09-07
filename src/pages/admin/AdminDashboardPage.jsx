@@ -1,16 +1,22 @@
 
 import React from "react";
+import { useOwnerShop } from "../../hooks/useOwnerShop";
 import { useOrders } from "../../hooks/useOrders";
 import StatsCards from "../../components/admin/StatsCards";
 import { OrderCard } from "../../components/admin/OrderCard";
 import { LoadingSkeleton } from "../../components/LoadingSkeleton";
 
 export default function AdminDashboardPage() {
+  // Get the currently logged-in owner's shop
+  const { shop } = useOwnerShop();
+
+  // IMPORTANT:
+  // Pass shop.id so orders can be loaded for this shop
   const {
     orders,
     loading,
     updateOrderStatus,
-  } = useOrders();
+  } = useOrders(shop?.id);
 
   if (loading) {
     return <LoadingSkeleton count={4} />;
@@ -26,22 +32,17 @@ export default function AdminDashboardPage() {
       return sum;
     }
 
+    // Use stored totalAmount if available
     let amount = Number(order.totalAmount) || 0;
 
-    // Fallback: calculate total from items
-    if (
-      amount === 0 &&
-      Array.isArray(order.items)
-    ) {
-      amount = order.items.reduce(
-        (itemSum, item) => {
-          const price = Number(item.price) || 0;
-          const quantity = Number(item.quantity) || 1;
+    // Fallback: calculate total from ordered items
+    if (amount === 0 && Array.isArray(order.items)) {
+      amount = order.items.reduce((itemSum, item) => {
+        const price = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 1;
 
-          return itemSum + price * quantity;
-        },
-        0
-      );
+        return itemSum + price * quantity;
+      }, 0);
     }
 
     return sum + amount;
@@ -61,13 +62,13 @@ export default function AdminDashboardPage() {
     (order) => order.status === "Completed"
   ).length;
 
-  // Show latest 6 orders
+  // Latest 6 orders
   const latestOrders = orders.slice(0, 6);
 
   return (
     <div className="space-y-6">
 
-      {/* Statistics */}
+      {/* Statistics Cards */}
       <StatsCards
         totalOrders={totalOrders}
         totalSales={totalSales}
