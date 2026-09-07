@@ -1,59 +1,78 @@
-import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import { useOwnerShop } from "../../hooks/useOwnerShop";
 import { useOrders } from "../../hooks/useOrders";
-import { ORDER_STATUSES } from "../../services/orderService";
 import OrderCard from "../../components/admin/OrderCard";
-import { OrderListSkeleton } from "../../components/LoadingSkeleton";
+import { ProductListSkeleton } from "../../components/LoadingSkeleton";
 
 export default function AdminOrdersPage() {
-  const { shop, loading: shopLoading, error: shopError } = useOwnerShop();
-  const { orders, loading, error } = useOrders(shop?.id);
-  const [filter, setFilter] = useState("All");
-  const [searchParams] = useSearchParams();
-  const highlight = searchParams.get("highlight");
+  const { shop } = useOwnerShop();
+  const { activeOrders, completedOrders, todayOrders, loading, error } =
+    useOrders(shop?.id);
 
-  const filtered = useMemo(
-    () =>
-      filter === "All" ? orders : orders.filter((o) => o.status === filter),
-    [orders, filter]
-  );
+  const [tab, setTab] = useState("active"); // "active" | "completed" | "all"
 
-  if (shopLoading) return <OrderListSkeleton />;
-  if (shopError) return <p className="text-ink-700">{shopError}</p>;
+  if (loading) return <ProductListSkeleton />;
+  if (error) return <p className="text-ink-700">{error}</p>;
+
+  // Tab ke hisab se orders pick karein
+  const displayedOrders =
+    tab === "active"
+      ? activeOrders
+      : tab === "completed"
+      ? completedOrders
+      : todayOrders;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold">Orders</h1>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-extrabold">Orders</h1>
 
-      <div className="no-scrollbar flex gap-2 overflow-x-auto">
-        {["All", ...ORDER_STATUSES].map((s) => (
+        {/* Filter Tabs */}
+        <div className="flex w-fit rounded-xl bg-sand p-1 text-xs font-bold">
           <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium ${
-              filter === s ? "bg-ink-950 text-paper" : "bg-paper shadow-soft"
+            onClick={() => setTab("active")}
+            className={`rounded-lg px-3.5 py-2 transition ${
+              tab === "active"
+                ? "bg-ink-950 text-paper shadow-soft"
+                : "text-ink-700 hover:text-ink-950"
             }`}
           >
-            {s}
+            Active ({activeOrders.length})
           </button>
-        ))}
+
+          <button
+            onClick={() => setTab("completed")}
+            className={`rounded-lg px-3.5 py-2 transition ${
+              tab === "completed"
+                ? "bg-ink-950 text-paper shadow-soft"
+                : "text-ink-700 hover:text-ink-950"
+            }`}
+          >
+            Completed ({completedOrders.length})
+          </button>
+
+          <button
+            onClick={() => setTab("all")}
+            className={`rounded-lg px-3.5 py-2 transition ${
+              tab === "all"
+                ? "bg-ink-950 text-paper shadow-soft"
+                : "text-ink-700 hover:text-ink-950"
+            }`}
+          >
+            All Today ({todayOrders.length})
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <OrderListSkeleton />
-      ) : error ? (
-        <p className="text-ink-700">{error}</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-ink-700">No orders in this category.</p>
+      {/* Orders List */}
+      {displayedOrders.length === 0 ? (
+        <div className="rounded-xl2 bg-paper p-8 text-center text-sm font-medium text-ink-700 shadow-soft">
+          No {tab} orders for today.
+        </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {filtered.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              highlighted={order.id === highlight}
-            />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {displayedOrders.map((order) => (
+            <OrderCard key={order.id} order={order} />
           ))}
         </div>
       )}
