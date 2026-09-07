@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOwnerShop } from "../../hooks/useOwnerShop";
 import { useOrders } from "../../hooks/useOrders";
 import { useAuth } from "../../context/AuthContext";
@@ -6,6 +6,10 @@ import StatsCards from "../../components/admin/StatsCards";
 import OrderCard from "../../components/admin/OrderCard";
 import { OrderListSkeleton } from "../../components/LoadingSkeleton";
 import { registerOwnerForPush } from "../../firebase/messaging";
+import {
+  requestNotificationPermission,
+  showNotification,
+} from "../../utils/notification";
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -13,14 +17,53 @@ export default function AdminDashboardPage() {
   const { orders, loading, error } = useOrders(shop?.id);
   const [pushStatus, setPushStatus] = useState(null);
 
+  // Initial load tracking ref (pehli baar refresh hone par sound na baje)
+  const prevOrdersCountRef = useRef(null);
+
   useEffect(() => {
     if (!user) return;
     registerOwnerForPush(user.uid).then(setPushStatus);
+    // Notification permission ask karein
+    requestNotificationPermission();
   }, [user]);
+
+  // 🟢 Live New Order Alert (Sound + Browser Notification)
+  useEffect(() => {
+    if (loading || !orders) return;
+
+    // First load par orders count save karein
+    if (prevOrdersCountRef.current === null) {
+      prevOrdersCountRef.current = orders.length;
+      return;
+    }
+
+    // Jab naya order aaye (Count increase ho)
+    if (orders.length > prevOrdersCountRef.current) {
+      const latestOrder = orders[0]; // Newest order
+
+      // 1. Sound Play
+      const audio = new Audio("/alert.mp3");
+      audio.play().catch((err) =>
+        console.log("Audio play blocked by browser:", err)
+      );
+
+      // 2. Desktop/Mobile Notification
+      showNotification(
+        "🚨 New Order Received!",
+        `Order from ${latestOrder?.customerName || "Customer"}`
+      );
+    }
+
+    prevOrdersCountRef.current = orders.length;
+  }, [orders, loading]);
 
   if (shopLoading) return <OrderListSkeleton />;
   if (shopError) {
-    return <p className="rounded-xl2 bg-paper p-5 text-ink-700 shadow-soft">{shopError}</p>;
+    return (
+      <p className="rounded-xl2 bg-paper p-5 text-ink-700 shadow-soft">
+        {shopError}
+      </p>
+    );
   }
 
   return (

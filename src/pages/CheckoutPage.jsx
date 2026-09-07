@@ -5,6 +5,10 @@ import { useCart } from "../context/CartContext";
 import { placeOrder } from "../services/orderService";
 import { formatCurrency } from "../utils/formatCurrency";
 import { Spinner } from "../components/LoadingSkeleton";
+import {
+  requestNotificationPermission,
+  showNotification,
+} from "../utils/notification";
 
 export default function CheckoutPage() {
   const { shopId } = useParams();
@@ -33,6 +37,9 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
+      // 🟢 Notification Permission Maangein
+      await requestNotificationPermission();
+
       const result = await placeOrder({
         shopId,
         customerName: name,
@@ -42,7 +49,7 @@ export default function CheckoutPage() {
         items,
       });
 
-      // 🟢 Multiple active orders save karne ka updated logic
+      // Multiple active orders save karne ka logic
       const existingOrders = JSON.parse(
         localStorage.getItem(`activeOrderIds_${shopId}`) || "[]"
       );
@@ -53,6 +60,12 @@ export default function CheckoutPage() {
       localStorage.setItem(
         `activeOrderIds_${shopId}`,
         JSON.stringify(updatedOrders)
+      );
+
+      // 🟢 User ko Instant Order Placed Notification dikhayein
+      showNotification(
+        "Order Placed! 🎉",
+        `Your order #${result.orderCode || result.orderId.slice(-4)} has been received successfully.`
       );
 
       clearCart();
