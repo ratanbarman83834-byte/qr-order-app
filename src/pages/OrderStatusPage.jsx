@@ -1,151 +1,171 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { doc, onSnapshot } from "firebase/firestore";
-import { ArrowLeft, ShoppingBag, Phone, User } from "lucide-react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { doc, onSnapshot, collectionGroup, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { Clock, Utensils, CheckCircle2, XCircle, ArrowLeft, ShoppingBag } from "lucide-react";
 import { formatCurrency } from "../utils/formatCurrency";
-import OrderStatusTracker from "../components/OrderStatusTracker";
 import { Spinner } from "../components/LoadingSkeleton";
 
 export default function OrderStatusPage() {
-  const { shopId, orderId } = useParams();
+  const { orderId } = useParams();
+  const [searchParams] = useSearchParams();
+  const shopIdFromUrl = searchParams.get("shopId") || localStorage.getItem("shopId");
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!shopId || !orderId) {
-      setError("Invalid URL. Missing Shop ID or Order ID.");
+    if (!orderId) {
       setLoading(false);
       return;
     }
 
-    const orderRef = doc(db, "shops", shopId, "orders", orderId);
-    
-    const unsubscribe = onSnapshot(
-      orderRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          setOrder({ id: docSnap.id, ...docSnap.data() });
-          setError(null);
-        } else {
-          setError("Order not found.");
+    setLoading(true);
+
+    // 1. Live real-time status tracker agar shopId available ho
+    if (shopIdFromUrl) {
+      const orderRef = doc(db, "shops", shopIdFromUrl, "orders", orderId);
+      
+      const unsubscribe = onSnapshot(
+        orderRef, 
+        (docSnap) => {
+          if (docSnap.exists()) {
+            setOrder({ id: docSnap.id, ...docSnap.data() });
+            setLoading(false);
+          } else {
+            fetchByCollectionGroup();
+          }
+        }, 
+        () => {
+          fetchByCollectionGroup();
         }
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching order status:", err);
-        setError("Failed to load order status. Please refresh.");
+      );
+
+      return () => unsubscribe();
+    } else {
+      fetchByCollectionGroup();
+    }
+
+    // 2. Collection Group Query (Agar shopId URL me na ho toh bhi order dhoondh lega)
+    async function fetchByCollectionGroup() {
+      try {
+        const q = query(
+          collectionGroup(db, "orders"),
+          where("id", "==", orderId)
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const foundDoc = snapshot.docs[0];
+          setOrder({ id: foundDoc.id, ...foundDoc.data() });
+        } else {
+          setOrder(null);
+        }
+      } catch (err) {
+        console.error("Error finding order:", err);
+        setOrder(null);
+      } finally {
         setLoading(false);
       }
-    );
-
-    return () => unsubscribe();
-  }, [shopId, orderId]);
+    }
+  }, [orderId, shopIdFromUrl]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper p-4">
-        <div className="flex flex-col items-center gap-3">
-          <Spinner className="w-8 h-8 text-marigold-500" />
-          <p className="text-sm font-medium text-ink-700">Loading order status...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <Spinner />
       </div>
     );
   }
 
-  if (error || !order) {
+  // Order Not Found
+  if (!order) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-paper p-4 text-center">
-        <div className="rounded-full bg-clay-500/10 p-4 text-clay-600 mb-3">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-4 bg-paper">
+        <div className="rounded-full bg-clay-500/10 p-4 text-clay-600">
           <ShoppingBag size={32} />
         </div>
-        <h1 className="text-xl font-bold text-ink-950 mb-1">Order Not Found</h1>
-        <p className="text-sm text-ink-700 mb-6">{error || "We couldn't find your order."}</p>
-        <Link
-          to={shopId ? `/s/${shopId}` : "/"}
-          className="inline-flex items-center gap-2 rounded-xl bg-marigold-500 px-5 py-2.5 text-sm font-bold text-ink-950 shadow-soft"
+        <h2 className="text-xl font-bold text-ink-950">Order Not Found</h2>
+        <p className="text-xs text-ink-700">Order not found.</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 rounded-xl bg-marigold-500 px-5 py-2.5 text-xs font-bold text-ink-950 shadow-soft"
         >
           <ArrowLeft size={16} /> Back to Menu
-        </Link>
+        </button>
       </div>
     );
   }
 
+  const statusConfig = {
+    received: {
+      label: "Order Received",
+      badgeClass: "bg-blue-500/10 text-blue-600",
+      icon: <Clock size={20} />,
+    },
+    preparing: {
+      label: "Preparing Your Order",
+      badgeClass: "bg-marigold-500/10 text-marigold-700",
+      icon: <Utensils size={20} />,
+    },
+    completed: {
+      label: "Order Completed",
+      badgeClass: "bg-emerald-500/10 text-emerald-600",
+      icon: <CheckCircle2 size={20} />,
+    },
+    cancelled: {
+      label: "Order Cancelled",
+      badgeClass: "bg-clay-500/10 text-clay-600",
+      icon: <XCircle size={20} />,
+    },
+  };
+
+  const currentStatus = statusConfig[order?.status] || statusConfig.received;
+
   return (
-    <div className="min-h-screen bg-paper pb-12">
-      <header className="sticky top-0 z-10 border-b border-ink-950/10 bg-paper/80 backdrop-blur-md px-4 py-3">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <Link
-            to={`/s/${shopId}`}
-            className="flex items-center gap-2 text-xs font-bold text-ink-700 hover:text-ink-950"
-          >
-            <ArrowLeft size={16} /> Menu
-          </Link>
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-600">
-            Live Order Status
-          </span>
-        </div>
-      </header>
+    <div className="min-h-screen bg-paper p-4 md:p-6 space-y-4 max-w-md mx-auto">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1.5 text-xs font-bold text-ink-700 mb-2"
+      >
+        <ArrowLeft size={16} /> Back to Menu
+      </button>
 
-      <main className="mx-auto max-w-md px-4 pt-6 space-y-6">
-        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5 text-center space-y-2">
-          <span className="inline-block rounded-full bg-marigold-500/10 px-3 py-1 text-xs font-bold text-marigold-700">
-            Order #{order.orderCode || order.id?.slice(-4)}
-          </span>
-          <h1 className="text-xl font-extrabold text-ink-950">
-            {order.status === "completed"
-              ? "Order Completed! 🎉"
-              : order.status === "preparing"
-              ? "Preparing Your Food 🍳"
-              : order.status === "cancelled"
-              ? "Order Cancelled ❌"
-              : "Order Received ⏳"}
-          </h1>
-          <p className="text-xs text-ink-700">
-            {order.tableNumber ? `Table Number: ${order.tableNumber}` : "Dine-in / Takeaway"}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5">
-          <OrderStatusTracker status={order.status} />
-        </div>
-
-        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5 space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-ink-700 border-b border-ink-950/10 pb-2">
-            Order Details
-          </h2>
-          
-          <div className="space-y-2">
-            {order.items?.map((item, idx) => (
-              <div key={idx} className="flex justify-between text-sm text-ink-900">
-                <span>
-                  {item.name} <strong className="text-ink-950">× {item.quantity}</strong>
-                </span>
-                <span className="font-semibold">{formatCurrency(item.price * item.quantity)}</span>
-              </div>
-            ))}
+      <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5 space-y-4">
+        <div className="flex items-center justify-between border-b border-ink-950/10 pb-3">
+          <div>
+            <h1 className="text-base font-extrabold text-ink-950">
+              Order #{order?.orderCode || order?.id?.slice(-4)}
+            </h1>
+            {order?.tableNumber && (
+              <span className="text-xs font-semibold text-ink-700">
+                Table {order.tableNumber}
+              </span>
+            )}
           </div>
-
-          <div className="border-t border-ink-950/10 pt-3 flex justify-between text-base font-extrabold text-ink-950">
-            <span>Total Amount</span>
-            <span>{formatCurrency(order.totalAmount || order.subtotal || 0)}</span>
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${currentStatus.badgeClass}`}>
+            {currentStatus.icon}
+            <span>{currentStatus.label}</span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-paper p-5 shadow-soft border border-ink-950/5 space-y-2 text-xs text-ink-800">
-          <div className="flex items-center gap-2">
-            <User size={14} className="text-ink-600" />
-            <span>Name: <strong>{order.customerName || "Guest"}</strong></span>
-          </div>
-          {order.customerPhone && (
-            <div className="flex items-center gap-2">
-              <Phone size={14} className="text-ink-600" />
-              <span>Phone: <strong>{order.customerPhone}</strong></span>
+        {/* Ordered Items */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase text-ink-700">Items Ordered:</p>
+          {order?.items?.map((item, idx) => (
+            <div key={idx} className="flex justify-between text-xs font-medium text-ink-900">
+              <span>{item?.name} × {item?.quantity || 1}</span>
+              <span>{formatCurrency((item?.price || 0) * (item?.quantity || 1))}</span>
             </div>
-          )}
+          ))}
+
+          <div className="flex justify-between border-t border-ink-950/10 pt-2 text-sm font-black text-ink-950">
+            <span>Total:</span>
+            <span>{formatCurrency(order?.totalAmount || order?.subtotal || 0)}</span>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
