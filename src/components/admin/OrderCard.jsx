@@ -1,216 +1,102 @@
-import { useState, useEffect } from "react";
-import { doc, setDoc } from "firebase/firestore";
-import { 
-  Clock, 
-  Utensils, 
-  CheckCircle2, 
-  XCircle, 
-  Phone, 
-  User, 
-  MessageSquare,
-  Sparkles 
-} from "lucide-react";
-import { db } from "../../firebase/config";
-import { formatCurrency } from "../../utils/formatCurrency";
-import { Spinner } from "../LoadingSkeleton";
+import React from 'react';
+import { formatCurrency } from '../../utils/formatCurrency';
 
-export default function OrderCard({ order = {}, shopId }) {
-  const [updating, setUpdating] = useState(false);
-  
-  // Instant UI update ke liye local state
-  const [currentStatusKey, setCurrentStatusKey] = useState(order?.status || "received");
+export function OrderCard({ order, onUpdateStatus }) {
+  // Ensure items array exists
+  const items = order.items || [];
 
-  // Sync state if order prop changes from parent
-  useEffect(() => {
-    if (order?.status) {
-      setCurrentStatusKey(order.status);
+  // Recalculate total if order.totalAmount is 0 or missing
+  const calculatedTotal = items.reduce((acc, item) => {
+    const price = Number(item.price) || 0;
+    const qty = Number(item.quantity) || 1;
+    return acc + price * qty;
+  }, 0);
+
+  const displayTotal = order.totalAmount && Number(order.totalAmount) > 0 
+    ? Number(order.totalAmount) 
+    : calculatedTotal;
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'new':
+      case 'received':
+        return 'bg-blue-100 text-blue-800';
+      case 'preparing':
+        return 'bg-amber-100 text-amber-800';
+      case 'completed':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'cancelled':
+        return 'bg-rose-100 text-rose-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-  }, [order?.status]);
-
-  const currentShopId = shopId || order?.shopId;
-
-  async function handleStatusChange(newStatus) {
-    if (!currentShopId) {
-      alert("Shop ID missing. Cannot update status.");
-      return;
-    }
-    if (!order?.id) {
-      alert("Order ID missing.");
-      return;
-    }
-
-    const previousStatus = currentStatusKey;
-    
-    // 1. Turant UI update karein (Optimistic UI Update)
-    setCurrentStatusKey(newStatus);
-    setUpdating(true);
-
-    try {
-      const orderRef = doc(db, "shops", currentShopId, "orders", order.id);
-      
-      // 2. Firebase Database Update
-      await setDoc(
-        orderRef, 
-        {
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-        }, 
-        { merge: true }
-      );
-
-      console.log(`Order status updated to: ${newStatus}`);
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      alert("Failed to update order status. Please try again.");
-      
-      // Error aane par purana status wapas set karein
-      setCurrentStatusKey(previousStatus);
-    } finally {
-      setUpdating(false);
-    }
-  }
-
-  const statusConfig = {
-    received: {
-      label: "New / Received",
-      badgeClass: "bg-blue-500/10 text-blue-600",
-      icon: <Clock size={16} />,
-    },
-    preparing: {
-      label: "Preparing",
-      badgeClass: "bg-marigold-500/10 text-marigold-700",
-      icon: <Utensils size={16} />,
-    },
-    completed: {
-      label: "Completed",
-      badgeClass: "bg-emerald-500/10 text-emerald-600",
-      icon: <CheckCircle2 size={16} />,
-    },
-    cancelled: {
-      label: "Cancelled",
-      badgeClass: "bg-clay-500/10 text-clay-600",
-      icon: <XCircle size={16} />,
-    },
   };
 
-  const currentStatus = statusConfig[currentStatusKey] || statusConfig.received;
-
   return (
-    <div className="rounded-xl2 bg-paper p-5 shadow-soft border border-ink-950/5 space-y-4">
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-ink-950/10 pb-3">
-        <div>
-          <span className="text-xs font-semibold uppercase text-ink-700">
-            Order #{order?.orderCode || order?.id?.slice(-4) || "N/A"}
+    <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-5 flex flex-col justify-between">
+      <div>
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <span className="font-semibold text-stone-900">
+              ORDER #{order.id ? order.id.slice(-4).toUpperCase() : '----'}
+            </span>
+            {order.customerName && (
+              <p className="text-sm text-stone-600 mt-0.5">👤 {order.customerName}</p>
+            )}
+            {order.tableNumber && (
+              <p className="text-xs text-stone-500 mt-0.5">Table: {order.tableNumber}</p>
+            )}
+          </div>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(order.status)}`}>
+            {order.status === 'new' || order.status === 'received' ? '⏱️ New / Received' : order.status}
           </span>
-          {order?.tableNumber && (
-            <span className="ml-2 inline-block rounded-md bg-ink-950/5 px-2 py-0.5 text-xs font-bold text-ink-900">
-              Table {order.tableNumber}
-            </span>
-          )}
         </div>
 
-        <div
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${currentStatus.badgeClass}`}
-        >
-          {currentStatus.icon}
-          <span>{currentStatus.label}</span>
+        <div className="border-t border-b border-stone-100 py-3 my-3">
+          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">Items Ordered:</p>
+          <div className="space-y-1.5">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex justify-between text-sm">
+                <span className="text-stone-700">
+                  {item.name || item.title || 'Item'} × {item.quantity || 1}
+                </span>
+                <span className="text-stone-500">
+                  {formatCurrency((Number(item.price) || 0) * (Number(item.quantity) || 1))}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-base font-semibold text-stone-900 mt-3 pt-2 border-t border-dashed border-stone-200">
+            <span>Total:</span>
+            <span>{formatCurrency(displayTotal)}</span>
+          </div>
         </div>
       </div>
 
-      {/* Customer Info */}
-      <div className="grid grid-cols-1 gap-1.5 text-sm text-ink-800">
-        <div className="flex items-center gap-2 font-medium text-ink-950">
-          <User size={15} className="text-ink-700" />
-          <span>{order?.customerName || "Guest"}</span>
-        </div>
-
-        {order?.customerPhone && (
-          <div className="flex items-center gap-2 text-xs text-ink-700">
-            <Phone size={14} />
-            <a
-              href={`tel:${order.customerPhone}`}
-              className="underline hover:text-ink-950"
-            >
-              {order.customerPhone}
-            </a>
-          </div>
-        )}
-
-        {order?.notes && (
-          <div className="mt-1 flex items-start gap-2 rounded-lg bg-marigold-50 p-2 text-xs text-marigold-800">
-            <MessageSquare size={14} className="mt-0.5 shrink-0" />
-            <span>Note: {order.notes}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Items List */}
-      <div className="rounded-xl bg-ink-950/5 p-3 space-y-1.5">
-        <p className="text-xs font-bold uppercase text-ink-700 mb-1">
-          Items Ordered:
-        </p>
-        {order?.items?.map((item, idx) => (
-          <div
-            key={item?.id || idx}
-            className="flex justify-between text-xs font-medium text-ink-900"
+      <div className="space-y-2 mt-2">
+        <p className="text-xs text-stone-500 font-medium">Update Order Status:</p>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => onUpdateStatus(order.id, 'preparing')}
+            disabled={order.status === 'preparing'}
+            className="px-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors"
           >
-            <span>
-              {item?.name} <strong className="text-ink-950">× {item?.quantity || 1}</strong>
-            </span>
-            <span>{formatCurrency((item?.price || 0) * (item?.quantity || 1))}</span>
-          </div>
-        ))}
-
-        <div className="mt-2 flex justify-between border-t border-ink-950/10 pt-2 text-sm font-extrabold text-ink-950">
-          <span>Total:</span>
-          <span>{formatCurrency(order?.totalAmount || order?.subtotal || 0)}</span>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="pt-2">
-        <p className="mb-2 text-xs font-semibold text-ink-700">Update Order Status:</p>
-        
-        <div className="flex flex-wrap gap-2">
-          {/* Mark Preparing */}
-          {currentStatusKey !== "preparing" && currentStatusKey !== "completed" && (
-            <button
-              onClick={() => handleStatusChange("preparing")}
-              disabled={updating}
-              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 rounded-xl bg-marigold-500 py-2.5 px-3 text-xs font-bold text-ink-950 shadow-soft transition active:scale-[0.98] disabled:opacity-50"
-            >
-              {updating ? <Spinner /> : <Utensils size={14} />}
-              Mark Preparing
-            </button>
-          )}
-
-          {/* Mark Completed */}
-          {currentStatusKey !== "completed" && (
-            <button
-              onClick={() => handleStatusChange("completed")}
-              disabled={updating}
-              className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 px-3 text-xs font-bold text-paper shadow-soft transition active:scale-[0.98] disabled:opacity-50"
-            >
-              {updating ? <Spinner /> : <Sparkles size={14} />}
-              Mark Completed
-            </button>
-          )}
-
-          {/* Cancel Order */}
-          {currentStatusKey !== "cancelled" && currentStatusKey !== "completed" && (
-            <button
-              onClick={() => {
-                if (window.confirm("Are you sure you want to cancel this order?")) {
-                  handleStatusChange("cancelled");
-                }
-              }}
-              disabled={updating}
-              className="rounded-xl bg-clay-500/10 py-2.5 px-3 text-xs font-bold text-clay-600 hover:bg-clay-500/20 transition active:scale-[0.98] disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          )}
+            🍳 Mark Preparing
+          </button>
+          <button
+            onClick={() => onUpdateStatus(order.id, 'completed')}
+            disabled={order.status === 'completed'}
+            className="px-2 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors"
+          >
+            ❇️ Mark Completed
+          </button>
+          <button
+            onClick={() => onUpdateStatus(order.id, 'cancelled')}
+            disabled={order.status === 'cancelled'}
+            className="px-2 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 disabled:opacity-50 rounded-lg text-xs font-semibold transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
