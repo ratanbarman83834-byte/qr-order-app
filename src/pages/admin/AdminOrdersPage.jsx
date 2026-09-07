@@ -1,20 +1,33 @@
+
 import { useState } from "react";
 import { useOwnerShop } from "../../hooks/useOwnerShop";
 import { useOrders } from "../../hooks/useOrders";
-import OrderCard from "../../components/admin/OrderCard";
+import { OrderCard } from "../../components/admin/OrderCard";
 import { ProductListSkeleton } from "../../components/LoadingSkeleton";
 
 export default function AdminOrdersPage() {
   const { shop } = useOwnerShop();
-  const { activeOrders, completedOrders, todayOrders, loading, error } =
-    useOrders(shop?.id);
 
-  const [tab, setTab] = useState("active"); // "active" | "completed" | "all"
+  const {
+    activeOrders,
+    completedOrders,
+    todayOrders,
+    loading,
+    error,
+    updateOrderStatus,
+  } = useOrders(shop?.id);
 
-  if (loading) return <ProductListSkeleton />;
-  if (error) return <p className="text-ink-700">{error}</p>;
+  const [tab, setTab] = useState("active");
 
-  // Tab ke hisab se orders pick karein
+  if (loading) {
+    return <ProductListSkeleton />;
+  }
+
+  if (error) {
+    return <p className="text-ink-700">{error}</p>;
+  }
+
+  // Select orders according to active tab
   const displayedOrders =
     tab === "active"
       ? activeOrders
@@ -24,8 +37,11 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-extrabold">Orders</h1>
+        <h1 className="text-2xl font-extrabold">
+          Orders
+        </h1>
 
         {/* Filter Tabs */}
         <div className="flex w-fit rounded-xl bg-sand p-1 text-xs font-bold">
@@ -72,7 +88,11 @@ export default function AdminOrdersPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {displayedOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              onUpdateStatus={updateOrderStatus}
+            />
           ))}
         </div>
       )}
