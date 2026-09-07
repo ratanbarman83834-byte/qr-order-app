@@ -7,16 +7,10 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "../firebase/config";
+import { db } from "../firebase/config"; // functions import ki zaroorat nahi hai
 
 /**
- * Places an order by calling the "createOrder" Cloud Function.
- *
- * IMPORTANT: we only send productId + quantity, never price. The function
- * looks up each product's current price in Firestore itself and computes the
- * total server-side — a customer editing the page's JS cannot change what
- * they're charged. See functions/index.js.
+ * Places an order by calling our free Vercel Serverless API (/api/createOrder).
  */
 export async function placeOrder({
   shopId,
@@ -26,16 +20,27 @@ export async function placeOrder({
   notes,
   items,
 }) {
-  const createOrder = httpsCallable(functions, "createOrder");
-  const result = await createOrder({
-    shopId,
-    customerName,
-    customerPhone: customerPhone || "",
-    tableNumber: tableNumber || "",
-    notes: notes || "",
-    items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+  const response = await fetch("/api/createOrder", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      shopId,
+      customerName,
+      customerPhone: customerPhone || "",
+      tableNumber: tableNumber || "",
+      notes: notes || "",
+      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    }),
   });
-  return result.data; // { orderId, orderCode, total, items, status }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Order place nahi ho paya. Phir se try karein.");
+  }
+
+  return await response.json(); // Returns { orderId, total, status }
 }
 
 /** Live status for the customer-facing order tracking page. */
