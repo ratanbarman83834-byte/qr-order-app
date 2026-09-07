@@ -5,7 +5,7 @@ import StatsCards from '../../components/admin/StatsCards';
 import { OrderCard } from '../../components/admin/OrderCard';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 
-export function AdminDashboardPage() {
+export default function AdminDashboardPage() {
   const { orders, loading, updateOrderStatus } = useOrders();
 
   if (loading) {
@@ -26,7 +26,8 @@ export function AdminDashboardPage() {
       amount = order.items.reduce((itemSum, item) => {
         return (
           itemSum +
-          (Number(item.price) || 0) * (Number(item.quantity) || 1)
+          (Number(item.price) || 0) *
+            (Number(item.quantity) || 1)
         );
       }, 0);
     }
