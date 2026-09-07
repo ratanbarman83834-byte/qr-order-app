@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { 
   Clock, 
@@ -16,6 +16,16 @@ import { Spinner } from "../LoadingSkeleton";
 
 export default function OrderCard({ order = {}, shopId }) {
   const [updating, setUpdating] = useState(false);
+  
+  // Instant UI update ke liye local state
+  const [currentStatusKey, setCurrentStatusKey] = useState(order?.status || "received");
+
+  // Sync state if order prop changes from parent
+  useEffect(() => {
+    if (order?.status) {
+      setCurrentStatusKey(order.status);
+    }
+  }, [order?.status]);
 
   const currentShopId = shopId || order?.shopId;
 
@@ -29,11 +39,16 @@ export default function OrderCard({ order = {}, shopId }) {
       return;
     }
 
+    const previousStatus = currentStatusKey;
+    
+    // 1. Turant UI update karein (Optimistic UI Update)
+    setCurrentStatusKey(newStatus);
     setUpdating(true);
+
     try {
       const orderRef = doc(db, "shops", currentShopId, "orders", order.id);
       
-      // updateDoc ki jagah setDoc with merge: true use kiya hai
+      // 2. Firebase Database Update
       await setDoc(
         orderRef, 
         {
@@ -47,6 +62,9 @@ export default function OrderCard({ order = {}, shopId }) {
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update order status. Please try again.");
+      
+      // Error aane par purana status wapas set karein
+      setCurrentStatusKey(previousStatus);
     } finally {
       setUpdating(false);
     }
@@ -75,10 +93,11 @@ export default function OrderCard({ order = {}, shopId }) {
     },
   };
 
-  const currentStatus = statusConfig[order?.status] || statusConfig.received;
+  const currentStatus = statusConfig[currentStatusKey] || statusConfig.received;
 
   return (
     <div className="rounded-xl2 bg-paper p-5 shadow-soft border border-ink-950/5 space-y-4">
+      {/* Top Header */}
       <div className="flex items-center justify-between border-b border-ink-950/10 pb-3">
         <div>
           <span className="text-xs font-semibold uppercase text-ink-700">
@@ -99,6 +118,7 @@ export default function OrderCard({ order = {}, shopId }) {
         </div>
       </div>
 
+      {/* Customer Info */}
       <div className="grid grid-cols-1 gap-1.5 text-sm text-ink-800">
         <div className="flex items-center gap-2 font-medium text-ink-950">
           <User size={15} className="text-ink-700" />
@@ -125,6 +145,7 @@ export default function OrderCard({ order = {}, shopId }) {
         )}
       </div>
 
+      {/* Items List */}
       <div className="rounded-xl bg-ink-950/5 p-3 space-y-1.5">
         <p className="text-xs font-bold uppercase text-ink-700 mb-1">
           Items Ordered:
@@ -147,11 +168,13 @@ export default function OrderCard({ order = {}, shopId }) {
         </div>
       </div>
 
+      {/* Action Buttons */}
       <div className="pt-2">
         <p className="mb-2 text-xs font-semibold text-ink-700">Update Order Status:</p>
         
         <div className="flex flex-wrap gap-2">
-          {order?.status !== "preparing" && order?.status !== "completed" && (
+          {/* Mark Preparing */}
+          {currentStatusKey !== "preparing" && currentStatusKey !== "completed" && (
             <button
               onClick={() => handleStatusChange("preparing")}
               disabled={updating}
@@ -162,7 +185,8 @@ export default function OrderCard({ order = {}, shopId }) {
             </button>
           )}
 
-          {order?.status !== "completed" && (
+          {/* Mark Completed */}
+          {currentStatusKey !== "completed" && (
             <button
               onClick={() => handleStatusChange("completed")}
               disabled={updating}
@@ -173,7 +197,8 @@ export default function OrderCard({ order = {}, shopId }) {
             </button>
           )}
 
-          {order?.status !== "cancelled" && order?.status !== "completed" && (
+          {/* Cancel Order */}
+          {currentStatusKey !== "cancelled" && currentStatusKey !== "completed" && (
             <button
               onClick={() => {
                 if (window.confirm("Are you sure you want to cancel this order?")) {
