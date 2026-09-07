@@ -15,8 +15,8 @@ const db = getFirestore();
  * computes subtotal/total itself, and writes the order. A customer can send
  * whatever "price" they want from devtools — it is ignored entirely.
  */
-exports.createOrder = onCall(async (request) => {
-  const { shopId, customerName, customerPhone, tableNumber, notes, items } =
+// ✅ NAYA CODE:
+exports.createOrder = onCall({ cors: true }, async (request) => {  const { shopId, customerName, customerPhone, tableNumber, notes, items } =
     request.data || {};
 
   if (!shopId || typeof shopId !== "string") {

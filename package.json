@@ -10,6 +10,7 @@
     "seed": "node scripts/seedDemoData.mjs"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "firebase": "^10.13.0",
     "lucide-react": "^0.383.0",
