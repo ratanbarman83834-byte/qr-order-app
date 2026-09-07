@@ -21,15 +21,32 @@ export default function ShopPage() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeOrderId, setActiveOrderId] = useState(null);
+
+  // Single ID ki jagah Multiple IDs ki List state
+  const [activeOrderIds, setActiveOrderIds] = useState([]);
 
   const { products, loading, error } = useProducts(shopId);
 
-  // Check localStorage for any active order in this shop
+  // LocalStorage se Multiple Active Orders fetch karne ka logic
   useEffect(() => {
-    const savedOrderId = localStorage.getItem(`activeOrderId_${shopId}`);
-    if (savedOrderId) {
-      setActiveOrderId(savedOrderId);
+    try {
+      const saved = localStorage.getItem(`activeOrderIds_${shopId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setActiveOrderIds(parsed);
+        } else {
+          setActiveOrderIds([saved]);
+        }
+      } else {
+        // Fallback agar purani single key mojood ho
+        const legacySingle = localStorage.getItem(`activeOrderId_${shopId}`);
+        if (legacySingle) {
+          setActiveOrderIds([legacySingle]);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading active orders:", e);
     }
   }, [shopId]);
 
@@ -136,23 +153,37 @@ export default function ShopPage() {
         )}
       </main>
 
-      {/* Floating Active Order Banner */}
-      {activeOrderId && (
+      {/* Multiple Active Orders Tracking Banner */}
+      {activeOrderIds.length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-30 flex items-center justify-between rounded-xl2 bg-ink-950 p-4 text-paper shadow-soft">
           <div className="flex items-center gap-3">
             <div className="animate-pulse rounded-lg bg-marigold-500 p-2 text-ink-950">
               <Clock size={20} />
             </div>
             <div>
-              <p className="text-xs text-paper/70">Active Order</p>
-              <p className="text-sm font-bold">Track your existing order</p>
+              <p className="text-xs text-paper/70">
+                {activeOrderIds.length === 1
+                  ? "Active Order"
+                  : `${activeOrderIds.length} Active Orders`}
+              </p>
+              <p className="text-sm font-bold">
+                {activeOrderIds.length === 1
+                  ? "Track your order"
+                  : "Track your latest order"}
+              </p>
             </div>
           </div>
           <button
-            onClick={() => navigate(`/shop/${shopId}/order/${activeOrderId}`)}
+            onClick={() =>
+              navigate(
+                `/shop/${shopId}/order/${
+                  activeOrderIds[activeOrderIds.length - 1]
+                }`
+              )
+            }
             className="rounded-xl bg-marigold-500 px-4 py-2 text-xs font-bold text-ink-950 transition hover:bg-marigold-400"
           >
-            View Status ➔
+            {activeOrderIds.length === 1 ? "View Status ➔" : "View Latest ➔"}
           </button>
         </div>
       )}

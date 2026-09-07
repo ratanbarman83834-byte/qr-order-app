@@ -42,8 +42,18 @@ export default function CheckoutPage() {
         items,
       });
 
-      // 🟢 Add this line to save active order for this shop
-      localStorage.setItem(`activeOrderId_${shopId}`, result.orderId);
+      // 🟢 Multiple active orders save karne ka updated logic
+      const existingOrders = JSON.parse(
+        localStorage.getItem(`activeOrderIds_${shopId}`) || "[]"
+      );
+      const updatedOrders = Array.from(
+        new Set([...existingOrders, result.orderId])
+      );
+
+      localStorage.setItem(
+        `activeOrderIds_${shopId}`,
+        JSON.stringify(updatedOrders)
+      );
 
       clearCart();
       navigate(`/shop/${shopId}/order/${result.orderId}`, {
@@ -156,7 +166,9 @@ export default function CheckoutPage() {
           className="flex w-full items-center justify-center gap-2 rounded-xl2 bg-marigold-500 py-4 text-base font-bold text-ink-950 shadow-soft transition active:scale-[0.98] disabled:opacity-60"
         >
           {submitting && <Spinner />}
-          {submitting ? "Placing order…" : `Place order · ${formatCurrency(subtotal)}`}
+          {submitting
+            ? "Placing order…"
+            : `Place order · ${formatCurrency(subtotal)}`}
         </button>
       </form>
     </div>
