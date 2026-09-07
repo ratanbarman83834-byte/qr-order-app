@@ -24,11 +24,22 @@ export default function AdminQRPage() {
 
   function handleDownload() {
     const canvas = canvasWrapperRef.current?.querySelector("canvas");
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = `${shop.name.replace(/\s+/g, "-").toLowerCase()}-qr.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    if (!canvas) {
+      toast.error("QR code ready nahi hai");
+      return;
+    }
+
+    const pngUrl = canvas.toDataURL("image/png");
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `${shop?.name ? shop.name.replace(/\s+/g, "-").toLowerCase() : "shop"}-qr.png`;
+
+    // Link ko DOM me attach karke click trigger kar rahe hain (Browser Block Fix)
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    toast.success("QR Code downloaded!");
   }
 
   return (
