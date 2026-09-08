@@ -1,12 +1,18 @@
-
-import React from 'react';
-import { formatCurrency } from '../../utils/formatCurrency';
+import React from "react";
+import {
+  UserRound,
+  Utensils,
+  Clock3,
+  ChefHat,
+  CheckCircle2,
+  XCircle,
+  Hash,
+} from "lucide-react";
+import { formatCurrency } from "../../utils/formatCurrency";
 
 export function OrderCard({ order, onUpdateStatus }) {
-  // Ensure items array exists
   const items = Array.isArray(order.items) ? order.items : [];
 
-  // Calculate total from items
   const calculatedTotal = items.reduce((acc, item) => {
     const price = Number(item.price) || 0;
     const quantity = Number(item.quantity) || 1;
@@ -14,175 +20,258 @@ export function OrderCard({ order, onUpdateStatus }) {
     return acc + price * quantity;
   }, 0);
 
-  // Use stored totalAmount if available,
-  // otherwise use calculated total
   const displayTotal =
-    Number(order.totalAmount) > 0
-      ? Number(order.totalAmount)
-      : calculatedTotal;
+    Number(order.total) > 0
+      ? Number(order.total)
+      : Number(order.totalAmount) > 0
+        ? Number(order.totalAmount)
+        : calculatedTotal;
 
-  // Status badge styles
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'new':
-      case 'received':
-        return 'bg-blue-100 text-blue-800';
+  const status = String(order.status || "new").toLowerCase();
 
-      case 'preparing':
-        return 'bg-amber-100 text-amber-800';
-
-      case 'completed':
-        return 'bg-emerald-100 text-emerald-800';
-
-      case 'cancelled':
-        return 'bg-rose-100 text-rose-800';
-
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const statusConfig = {
+    new: {
+      label: "New",
+      className: "bg-blue-50 text-blue-700 border-blue-100",
+      icon: Clock3,
+    },
+    received: {
+      label: "Received",
+      className: "bg-blue-50 text-blue-700 border-blue-100",
+      icon: Clock3,
+    },
+    accepted: {
+      label: "Accepted",
+      className: "bg-violet-50 text-violet-700 border-violet-100",
+      icon: CheckCircle2,
+    },
+    preparing: {
+      label: "Preparing",
+      className: "bg-amber-50 text-amber-700 border-amber-100",
+      icon: ChefHat,
+    },
+    ready: {
+      label: "Ready",
+      className: "bg-cyan-50 text-cyan-700 border-cyan-100",
+      icon: CheckCircle2,
+    },
+    completed: {
+      label: "Completed",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      icon: CheckCircle2,
+    },
+    cancelled: {
+      label: "Cancelled",
+      className: "bg-rose-50 text-rose-700 border-rose-100",
+      icon: XCircle,
+    },
   };
 
-  // Status display text
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'new':
-        return '⏱️ New';
-
-      case 'received':
-        return '📥 Received';
-
-      case 'preparing':
-        return '🍳 Preparing';
-
-      case 'completed':
-        return '✅ Completed';
-
-      case 'cancelled':
-        return '❌ Cancelled';
-
-      default:
-        return status || 'Unknown';
-    }
+  const currentStatus = statusConfig[status] || {
+    label: order.status || "Unknown",
+    className: "bg-stone-100 text-stone-700 border-stone-200",
+    icon: Clock3,
   };
+
+  const StatusIcon = currentStatus.icon;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-5 flex flex-col justify-between">
-      {/* Order Information */}
-      <div>
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <span className="font-semibold text-stone-900">
-              ORDER #
-              {order.id
-                ? order.id.slice(-4).toUpperCase()
-                : '----'}
-            </span>
+    <div
+      className="
+        flex h-full flex-col
+        overflow-hidden
+        rounded-2xl
+        border border-stone-200/80
+        bg-white
+        shadow-[0_6px_22px_rgba(28,25,23,0.05)]
+        transition-all
+        duration-200
+        hover:-translate-y-0.5
+        hover:shadow-[0_12px_30px_rgba(28,25,23,0.09)]
+      "
+    >
+      {/* Header */}
+      <div className="p-5 pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Hash size={15} className="text-stone-400" />
+
+              <p className="truncate text-base font-bold tracking-wide text-stone-900">
+                {order.id
+                  ? order.id.slice(-4).toUpperCase()
+                  : "----"}
+              </p>
+            </div>
 
             {order.customerName && (
-              <p className="text-sm text-stone-600 mt-0.5">
-                👤 {order.customerName}
-              </p>
+              <div className="mt-2 flex items-center gap-2 text-sm text-stone-500">
+                <UserRound size={16} className="text-stone-400" />
+                <span className="truncate">{order.customerName}</span>
+              </div>
             )}
 
             {order.tableNumber && (
-              <p className="text-xs text-stone-500 mt-0.5">
-                Table: {order.tableNumber}
-              </p>
+              <div className="mt-1.5 flex items-center gap-2 text-xs text-stone-400">
+                <Utensils size={14} />
+                <span>Table {order.tableNumber}</span>
+              </div>
             )}
           </div>
 
-          {/* Status Badge */}
+          {/* Status */}
           <span
-            className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusBadgeClass(
-              order.status
-            )}`}
+            className={`
+              inline-flex shrink-0 items-center gap-1.5
+              rounded-full
+              border
+              px-2.5 py-1.5
+              text-xs font-semibold
+              ${currentStatus.className}
+            `}
           >
-            {getStatusText(order.status)}
+            <StatusIcon size={13} strokeWidth={2.5} />
+            {currentStatus.label}
           </span>
-        </div>
-
-        {/* Ordered Items */}
-        <div className="border-t border-b border-stone-100 py-3 my-3">
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
-            Items Ordered:
-          </p>
-
-          {items.length === 0 ? (
-            <p className="text-sm text-stone-500">
-              No items found.
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {items.map((item, index) => {
-                const price = Number(item.price) || 0;
-                const quantity = Number(item.quantity) || 1;
-                const itemTotal = price * quantity;
-
-                return (
-                  <div
-                    key={item.id || index}
-                    className="flex justify-between text-sm gap-3"
-                  >
-                    <span className="text-stone-700">
-                      {item.name || item.title || 'Item'} ×{' '}
-                      {quantity}
-                    </span>
-
-                    <span className="text-stone-500 whitespace-nowrap">
-                      {formatCurrency(itemTotal)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Total */}
-          <div className="flex justify-between text-base font-semibold text-stone-900 mt-3 pt-2 border-t border-dashed border-stone-200">
-            <span>Total:</span>
-            <span>{formatCurrency(displayTotal)}</span>
-          </div>
         </div>
       </div>
 
-      {/* Update Order Status */}
-      <div className="space-y-2 mt-2">
-        <p className="text-xs text-stone-500 font-medium">
-          Update Order Status:
+      {/* Items */}
+      <div className="mx-5 border-y border-stone-100 py-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Utensils size={14} className="text-stone-400" />
+
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-400">
+            Items ordered
+          </p>
+        </div>
+
+        {items.length === 0 ? (
+          <p className="text-sm text-stone-500">
+            No items found.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {items.map((item, index) => {
+              const price = Number(item.price) || 0;
+              const quantity = Number(item.quantity) || 1;
+              const itemTotal = price * quantity;
+
+              return (
+                <div
+                  key={item.id || index}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="min-w-0 truncate text-stone-700">
+                    {item.name || item.title || "Item"}
+                    <span className="ml-1 text-stone-400">
+                      × {quantity}
+                    </span>
+                  </span>
+
+                  <span className="shrink-0 font-medium text-stone-600">
+                    {formatCurrency(itemTotal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Total */}
+        <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3">
+          <span className="text-sm font-semibold text-stone-700">
+            Total
+          </span>
+
+          <span className="text-lg font-extrabold text-stone-900">
+            {formatCurrency(displayTotal)}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-auto p-5 pt-4">
+        <p className="mb-2.5 text-xs font-semibold text-stone-500">
+          Update order status
         </p>
 
         <div className="grid grid-cols-3 gap-2">
           {/* Preparing */}
           <button
-            onClick={() =>
-              onUpdateStatus(order.id, 'preparing')
-            }
-            disabled={order.status === 'preparing'}
-            className="px-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors"
+            onClick={() => onUpdateStatus(order.id, "preparing")}
+            disabled={status === "preparing"}
+            className="
+              flex min-h-10 items-center justify-center gap-1
+              rounded-xl
+              border border-amber-200
+              bg-amber-50
+              px-2
+              py-2
+              text-xs
+              font-semibold
+              text-amber-700
+              transition
+              hover:bg-amber-100
+              active:scale-[0.98]
+              disabled:cursor-not-allowed
+              disabled:opacity-40
+            "
           >
-            🍳 Mark Preparing
+            <ChefHat size={14} />
+            <span className="hidden sm:inline">Preparing</span>
+            <span className="sm:hidden">Prep</span>
           </button>
 
           {/* Completed */}
           <button
-            onClick={() =>
-              onUpdateStatus(order.id, 'completed')
-            }
-            disabled={order.status === 'completed'}
-            className="px-2 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors"
+            onClick={() => onUpdateStatus(order.id, "completed")}
+            disabled={status === "completed"}
+            className="
+              flex min-h-10 items-center justify-center gap-1
+              rounded-xl
+              border border-emerald-200
+              bg-emerald-600
+              px-2
+              py-2
+              text-xs
+              font-semibold
+              text-white
+              transition
+              hover:bg-emerald-700
+              active:scale-[0.98]
+              disabled:cursor-not-allowed
+              disabled:opacity-40
+            "
           >
-            ✅ Mark Completed
+            <CheckCircle2 size={14} />
+            <span className="hidden sm:inline">Completed</span>
+            <span className="sm:hidden">Done</span>
           </button>
 
-          {/* Cancelled */}
+          {/* Cancel */}
           <button
-            onClick={() =>
-              onUpdateStatus(order.id, 'cancelled')
-            }
-            disabled={order.status === 'cancelled'}
-            className="px-2 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors"
+            onClick={() => onUpdateStatus(order.id, "cancelled")}
+            disabled={status === "cancelled"}
+            className="
+              flex min-h-10 items-center justify-center gap-1
+              rounded-xl
+              border border-rose-200
+              bg-rose-50
+              px-2
+              py-2
+              text-xs
+              font-semibold
+              text-rose-600
+              transition
+              hover:bg-rose-100
+              active:scale-[0.98]
+              disabled:cursor-not-allowed
+              disabled:opacity-40
+            "
           >
-            ❌ Cancel
+            <XCircle size={14} />
+            <span>Cancel</span>
           </button>
         </div>
       </div>

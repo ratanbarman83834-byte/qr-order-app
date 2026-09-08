@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useOwnerShop } from "../../hooks/useOwnerShop";
@@ -47,7 +46,7 @@ export default function AdminDashboardPage() {
     updateOrderStatus,
   } = useOrders(shop?.id);
 
-  // Wait for shop and orders
+  // Loading
   if (shopLoading || ordersLoading) {
     return <LoadingSkeleton count={4} />;
   }
@@ -55,7 +54,7 @@ export default function AdminDashboardPage() {
   // Shop error
   if (shopError) {
     return (
-      <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-700">
         {shopError}
       </div>
     );
@@ -64,7 +63,7 @@ export default function AdminDashboardPage() {
   // Orders error
   if (ordersError) {
     return (
-      <div className="rounded-xl bg-rose-50 border border-rose-200 p-5 text-rose-700">
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-700">
         {ordersError}
       </div>
     );
@@ -73,132 +72,63 @@ export default function AdminDashboardPage() {
   // No shop
   if (!shop?.id) {
     return (
-      <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 text-amber-700">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-medium text-amber-700">
         No shop found for this account.
       </div>
     );
   }
 
-  // ==============================
-  // NORMALIZE STATUS
-  // ==============================
-
-  const getStatus = (status) => {
-    if (!status) return "New";
-
-    const value = String(status).toLowerCase();
-
-    switch (value) {
-      case "new":
-      case "received":
-        return "New";
-
-      case "accepted":
-        return "Accepted";
-
-      case "preparing":
-        return "Preparing";
-
-      case "ready":
-        return "Ready";
-
-      case "completed":
-        return "Completed";
-
-      case "cancelled":
-        return "Cancelled";
-
-      default:
-        return status;
-    }
-  };
-
-  // ==============================
-  // DASHBOARD STATISTICS
-  // ==============================
-
-  const totalOrders = orders.length;
-
-  // Total sales
-  // Cancelled orders are excluded
-  const totalSales = orders.reduce((sum, order) => {
-    const status = getStatus(order.status);
-
-    if (status === "Cancelled") {
-      return sum;
-    }
-
-    // Your Firestore currently uses "total"
-    let amount = Number(order.total) || 0;
-
-    // Compatibility with totalAmount
-    if (amount === 0) {
-      amount = Number(order.totalAmount) || 0;
-    }
-
-    // Final fallback: calculate from items
-    if (amount === 0 && Array.isArray(order.items)) {
-      amount = order.items.reduce((itemTotal, item) => {
-        const price = Number(item.price) || 0;
-        const quantity = Number(item.quantity) || 1;
-
-        return itemTotal + price * quantity;
-      }, 0);
-    }
-
-    return sum + amount;
-  }, 0);
-
-  // Pending / active orders
-  const pendingOrders = orders.filter((order) => {
-    const status = getStatus(order.status);
-
-    return [
-      "New",
-      "Accepted",
-      "Preparing",
-      "Ready",
-    ].includes(status);
-  }).length;
-
-  // Completed orders
-  const completedOrders = orders.filter((order) => {
-    return getStatus(order.status) === "Completed";
-  }).length;
-
   // Latest 6 orders
   const latestOrders = orders.slice(0, 6);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+      {/* Dashboard heading */}
+      <div>
+        <h1 className="text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
+          Dashboard
+        </h1>
 
-      {/* ==============================
-          STATS CARDS
-      ============================== */}
+        <p className="mt-1 text-sm text-stone-500">
+          Keep track of your orders and sales.
+        </p>
+      </div>
 
+      {/* Stats */}
       <StatsCards orders={orders} />
 
-      {/* ==============================
-          LATEST ORDERS
-      ============================== */}
+      {/* Latest Orders */}
+      <section>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-stone-900 sm:text-2xl">
+              Latest orders
+            </h2>
 
-      <div>
-        <h2 className="mb-4 text-xl font-bold text-stone-900">
-          Latest orders
-        </h2>
+            <p className="mt-1 text-xs text-stone-400">
+              Your most recent customer orders
+            </p>
+          </div>
+
+          {orders.length > 0 && (
+            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-500">
+              {orders.length} total
+            </span>
+          )}
+        </div>
 
         {latestOrders.length === 0 ? (
-          <div className="rounded-xl bg-white border border-stone-200 p-8 text-center">
-            <p className="text-stone-500">
-              No orders placed yet.
+          <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center">
+            <p className="text-sm font-semibold text-stone-700">
+              No orders placed yet
             </p>
 
-            <p className="mt-2 text-xs text-stone-400">
-              Shop ID: {shop.id}
+            <p className="mt-1 text-xs text-stone-400">
+              Orders will appear here when customers place them.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {latestOrders.map((order) => (
               <OrderCard
                 key={order.id}
@@ -208,8 +138,7 @@ export default function AdminDashboardPage() {
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
-
