@@ -1,12 +1,37 @@
 
-import React from "react";
+import React, { useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { useOwnerShop } from "../../hooks/useOwnerShop";
 import { useOrders } from "../../hooks/useOrders";
 import StatsCards from "../../components/admin/StatsCards";
 import { OrderCard } from "../../components/admin/OrderCard";
 import { LoadingSkeleton } from "../../components/LoadingSkeleton";
+import { registerOwnerForPush } from "../../firebase/messaging";
 
 export default function AdminDashboardPage() {
+  const { user } = useAuth();
+
+  // Register the owner for push notifications
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let cancelled = false;
+
+    async function setupPushNotifications() {
+      const result = await registerOwnerForPush(user.uid);
+
+      if (!cancelled) {
+        console.log("🔔 Push registration result:", result);
+      }
+    }
+
+    setupPushNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
   // Get owner's shop
   const {
     shop,
